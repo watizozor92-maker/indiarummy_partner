@@ -1,0 +1,15 @@
+<?php
+declare(strict_types=1);
+namespace app\controller\api;
+use app\service\ApiResponder;use app\service\CsrfTokenService;use app\service\TenantContext;use app\service\WhitelistManager;use InvalidArgumentException;use RuntimeException;use think\Request;use think\Response;
+final class IpWhitelist
+{
+    public function index(int $channelId,TenantContext $tenant,WhitelistManager $manager,ApiResponder $api):Response{if(!$this->allowed($channelId,$tenant))return $api->error('TENANT_SCOPE_VIOLATION','不能访问其他商户的白名单',403);return $api->success($manager->list($channelId));}
+    public function create(int $channelId,Request $request,TenantContext $tenant,CsrfTokenService $csrf,WhitelistManager $manager,ApiResponder $api):Response
+    {if(!$this->allowed($channelId,$tenant))return $api->error('TENANT_SCOPE_VIOLATION','不能修改其他商户的白名单',403);if(!$csrf->validate('api',(string)$request->header('x-csrf-token','')))return $api->error('CSRF_INVALID','页面已过期，请刷新后重试',419);try{$id=$manager->create($channelId,(string)$request->post('ipOrCidr',''),(string)$request->post('remark',''),$tenant->user(),(string)$request->ip(),(string)$request->header('user-agent',''));return $api->success(['id'=>$id,'csrfToken'=>$csrf->issue('api')],'创建成功',201);}catch(InvalidArgumentException $e){return $api->error('VALIDATION_FAILED',$e->getMessage(),422);}}
+    public function update(int $channelId,int $id,Request $request,TenantContext $tenant,CsrfTokenService $csrf,WhitelistManager $manager,ApiResponder $api):Response
+    {if(!$this->allowed($channelId,$tenant))return $api->error('TENANT_SCOPE_VIOLATION','不能修改其他商户的白名单',403);if(!$csrf->validate('api',(string)$request->header('x-csrf-token','')))return $api->error('CSRF_INVALID','页面已过期，请刷新后重试',419);try{$manager->update($channelId,$id,(int)$request->post('status',1),(string)$request->post('remark',''),$tenant->user(),(string)$request->ip(),(string)$request->header('user-agent',''));return $api->success(['csrfToken'=>$csrf->issue('api')],'更新成功');}catch(InvalidArgumentException $e){return $api->error('VALIDATION_FAILED',$e->getMessage(),422);}catch(RuntimeException $e){return $api->error('RESOURCE_NOT_FOUND',$e->getMessage(),404);}}
+    public function delete(int $channelId,int $id,Request $request,TenantContext $tenant,CsrfTokenService $csrf,WhitelistManager $manager,ApiResponder $api):Response
+    {if(!$this->allowed($channelId,$tenant))return $api->error('TENANT_SCOPE_VIOLATION','不能修改其他商户的白名单',403);if(!$csrf->validate('api',(string)$request->header('x-csrf-token','')))return $api->error('CSRF_INVALID','页面已过期，请刷新后重试',419);try{$manager->delete($channelId,$id,$tenant->user(),(string)$request->ip(),(string)$request->header('user-agent',''));return $api->success(['csrfToken'=>$csrf->issue('api')],'删除成功');}catch(InvalidArgumentException $e){return $api->error('VALIDATION_FAILED',$e->getMessage(),422);}catch(RuntimeException $e){return $api->error('RESOURCE_NOT_FOUND',$e->getMessage(),404);}}
+    private function allowed(int $channelId,TenantContext $tenant):bool{return $tenant->isPlatformAdmin()||$tenant->channelId()===$channelId;}
+}

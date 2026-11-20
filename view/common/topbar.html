@@ -1,0 +1,11 @@
+<header class="partner-topbar">
+    <div class="partner-topbar-brand"><span class="partner-mini-mark">PG</span><strong>渠道游戏运营中心</strong></div>
+    <div class="partner-topbar-user">
+        <span>{$identity.display_name|htmlentities}</span><small>{$identity.role_code|htmlentities} · channel {$identity.channel_id}</small>
+        <button class="layui-btn layui-btn-primary layui-btn-sm" type="button" onclick="partnerChangePassword()">修改密码</button>
+        <form method="post" action="/logout"><input type="hidden" name="_token" value="{$logout_token|htmlentities}"><button class="layui-btn layui-btn-primary layui-btn-sm" type="submit">退出</button></form>
+    </div>
+</header>
+<script>
+async function partnerChangePassword(){const session=await fetch('/api/v1/session').then(r=>r.json());if(session.code!=='OK')return;layui.layer.open({type:1,title:'修改密码',area:['520px','480px'],content:`<div class="partner-detail-panel"><form id="password-form"><label class="partner-label">当前密码</label><input class="layui-input" type="password" name="currentPassword" autocomplete="current-password" required><label class="partner-label">新密码</label><input class="layui-input" type="password" name="newPassword" autocomplete="new-password" minlength="12" required><label class="partner-label">确认新密码</label><input class="layui-input" type="password" name="confirmPassword" autocomplete="new-password" minlength="12" required><p class="partner-form-tip">至少 12 位，包含大小写字母、数字和符号。</p><button class="layui-btn partner-primary-btn" type="submit">更新密码</button></form></div>`,success:()=>document.getElementById('password-form').addEventListener('submit',async e=>{e.preventDefault();const result=await fetch('/api/v1/auth/password',{method:'POST',headers:{'X-CSRF-Token':session.data.csrfToken},body:new URLSearchParams(new FormData(e.target))}).then(r=>r.json());if(result.code!=='OK')return layui.layer.msg(result.message);layui.layer.closeAll();layui.layer.msg('密码已更新');})});}
+</script>

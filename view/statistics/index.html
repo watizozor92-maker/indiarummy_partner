@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>数据统计 - 渠道游戏运营中心</title>
+  <link rel="stylesheet" href="/static/vendor/layui/css/layui.css">
+  <link rel="stylesheet" href="/static/css/partner.css">
+</head>
+<body class="partner-app-page">
+{include file="common/topbar" /}
+<div class="partner-app-shell">
+  {include file="common/sidebar" /}
+  <main class="partner-main">
+    <div class="partner-page-title">
+      <div><p class="partner-eyebrow">STATISTICS</p><h1>数据统计</h1></div>
+      <span class="partner-status"><i></i>币种独立口径</span>
+    </div>
+    <section class="partner-content-card partner-filter-card">
+      <form id="filters" class="partner-filter-grid compact">
+        <label>开始日期<input class="layui-input" name="from" type="date" value="{$default_from|htmlentities}"></label>
+        <label>结束日期<input class="layui-input" name="to" type="date" value="{$default_to|htmlentities}"></label>
+        <label>币种<input class="layui-input" name="currencyCode" placeholder="如 CNY"></label>
+        <button class="layui-btn partner-primary-btn">查询</button>
+        <button class="layui-btn layui-btn-primary" type="button" onclick="exportStatistics()">导出 CSV</button>
+      </form>
+    </section>
+    <div id="summary" class="partner-metric-grid"></div>
+    <section class="partner-content-card">
+      <div class="partner-card-heading"><div><strong>按游戏统计</strong><small>RTP 与两种命中率分开计算</small></div><span id="meta"></span></div>
+      <div class="partner-table-wrap">
+        <table class="partner-table">
+          <thead><tr><th>游戏</th><th>币种</th><th>投注</th><th>派彩</th><th>利润</th><th>实际 RTP</th><th>派彩局命中率</th><th>净赢局命中率</th><th>玩家 / 局数</th></tr></thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/static/vendor/layui/layui.js"></script>
+<script>
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const money=v=>Number(v||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:4});
+const pct=v=>v==null?'--':(Number(v)*100).toFixed(2)+'%';
+const profitClass=v=>Number(v)>0?'partner-positive':Number(v)<0?'partner-negative':'partner-neutral';
+async function load(){
+  const q=new URLSearchParams(new FormData(document.getElementById('filters')));
+  const p=await fetch('/api/v1/statistics?'+q).then(r=>r.json());
+  if(p.code!=='OK')return layui.layer.msg(p.message);
+  document.getElementById('meta').textContent=p.data.meta.timezone+' · '+p.data.meta.from.slice(0,10)+' 至 '+p.data.meta.to.slice(0,10);
+  document.getElementById('summary').innerHTML=p.data.summary.map(s=>`<article><span>${esc(s.currencyCode)} 平台利润</span><strong class="${profitClass(s.profitAmount)}">${money(s.profitAmount)}</strong><small>投注 ${money(s.betAmount)} / RTP ${pct(s.actualRtp)}</small></article>`).join('')||'<article><span>当前周期</span><strong>--</strong><small>暂无数据</small></article>';
+  document.getElementById('body').innerHTML=p.data.games.map(x=>`<tr><td><strong>${esc(x.title||x.game_id)}</strong><small>ID ${x.game_id}</small></td><td>${esc(x.currency_code)}</td><td>${money(x.bet_amount)}</td><td>${money(x.payout_amount)}</td><td class="${profitClass(x.profit_amount)}">${money(x.profit_amount)}</td><td>${pct(x.actual_rtp)}</td><td>${pct(x.payout_hit_rate)}</td><td>${pct(x.net_win_hit_rate)}</td><td>${x.player_count} / ${x.spin_count}</td></tr>`).join('')||'<tr><td colspan="9" class="partner-empty">暂无数据</td></tr>';
+}
+function exportStatistics(){
+  const q=new URLSearchParams(new FormData(document.getElementById('filters')));
+  window.location.href='/api/v1/statistics-export?'+q;
+}
+document.getElementById('filters').addEventListener('submit',e=>{e.preventDefault();load()});
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+{
+    "name": "indiarummy/partner-game-console",
+    "description": "IndiaRummy partner game operations and control console",
+    "type": "project",
+    "keywords": [
+        "framework",
+        "thinkphp",
+        "ORM"
+    ],
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "ext-curl": "*",
+        "ext-fileinfo": "*",
+        "ext-intl": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "ext-pdo_mysql": "*",
+        "ext-sodium": "*",
+        "ext-zip": "*",
+        "symfony/dotenv": "^7.4",
+        "topthink/framework": "6.1.2",
+        "topthink/think-orm": "^2.0",
+        "topthink/think-migration": "3.1",
+        "topthink/think-view": "2.0.5"
+    },
+    "require-dev": {
+        "cweagans/composer-patches": "2.0.0",
+        "phpunit/phpunit": "^11.5",
+        "symfony/var-dumper": "^7.4",
+        "topthink/think-trace": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "app\\": "app"
+        },
+        "psr-0": {
+            "": "extend/"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "cweagans/composer-patches": true,
+            "topthink/think-installer": true
+        },
+        "policy": {
+            "advisories": {
+                "ignore-id": {
+                    "PKSA-qzw1-yq5b-y8j5": "Official v6.1.5 exception-template XSS fix is reproducibly backported and covered by FrameworkPatchTest."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@php think service:discover",
+            "@php think vendor:publish"
+        ],
+        "test": [
+            "@php vendor/bin/phpunit"
+        ],
+        "security:verify": [
+            "@composer audit",
+            "@php vendor/bin/phpunit --filter FrameworkPatchTest"
+        ]
+    },
+    "extra": {
+        "patches": {
+            "topthink/framework": {
+                "Backport official exception-template XSS fix from v6.1.5": "patches/topthink-framework-6.1.2-exception-xss.patch"
+            }
+        }
+    }
+}

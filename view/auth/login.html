@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 渠道游戏运营中心</title>
+    <link rel="stylesheet" href="/static/vendor/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/partner.css">
+</head>
+<body class="partner-login-page">
+<main class="partner-login-shell">
+    <section class="partner-brand-panel">
+        <div class="partner-brand-mark">PG</div>
+        <p class="partner-eyebrow">PARTNER GAME CONSOLE</p>
+        <h1>渠道游戏运营中心</h1>
+        <p class="partner-brand-copy">面向合作渠道的玩家、记录、统计与游戏调控工作台。</p>
+        <div class="partner-brand-security">
+            <i class="layui-icon layui-icon-vercode"></i>
+            登录受账号状态、IP 白名单和操作审计保护
+        </div>
+    </section>
+
+    <section class="partner-login-card">
+        <div class="partner-login-heading">
+            <span>安全登录</span>
+            <small>请使用已授权的后台账号</small>
+        </div>
+
+        {if $error !== ''}
+        <div class="partner-alert" role="alert">
+            <i class="layui-icon layui-icon-close-fill"></i>
+            <span>{$error|htmlentities}</span>
+        </div>
+        {/if}
+
+        <form class="layui-form" method="post" action="/login" autocomplete="off">
+            <input type="hidden" name="_token" value="{$csrf_token|htmlentities}">
+
+            <div class="layui-form-item partner-form-item">
+                <label class="partner-label" for="username">账号</label>
+                <div class="layui-input-wrap">
+                    <div class="layui-input-prefix"><i class="layui-icon layui-icon-username"></i></div>
+                    <input id="username" class="layui-input" type="text" name="username"
+                           value="{$username|htmlentities}" maxlength="64" required lay-verify="required"
+                           placeholder="请输入账号" autocomplete="username">
+                </div>
+            </div>
+
+            <div class="layui-form-item partner-form-item">
+                <label class="partner-label" for="password">密码</label>
+                <div class="layui-input-wrap">
+                    <div class="layui-input-prefix"><i class="layui-icon layui-icon-password"></i></div>
+                    <input id="password" class="layui-input" type="password" name="password"
+                           maxlength="255" required lay-verify="required" placeholder="请输入密码"
+                           autocomplete="current-password">
+                </div>
+            </div>
+
+            <button class="layui-btn layui-btn-fluid partner-login-button" type="submit" lay-submit>
+                登录运营中心
+            </button>
+        </form>
+
+        <p class="partner-login-tip">无法登录时，请联系平台管理员核对账号状态和 IP 白名单。</p>
+    </section>
+</main>
+<script src="/static/vendor/layui/layui.js"></script>
+<script>layui.use(['form']);</script>
+</body>
+</html>

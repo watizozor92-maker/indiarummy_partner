@@ -1,0 +1,17 @@
+{
+    "_hash": "ceeff51fc434130d39f722bb529e230846c2b6caeb669aae41665f3a4fa75b37",
+    "patches": {
+        "topthink/framework": [
+            {
+                "package": "topthink/framework",
+                "description": "Backport official exception-template XSS fix from v6.1.5",
+                "url": "patches/topthink-framework-6.1.2-exception-xss.patch",
+                "sha256": "4d5d43833c5dff71fc5fcd94e89d59a59ce3b654be3b49e205cf69f4a6d01875",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

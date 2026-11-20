@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>游戏调控 - 渠道游戏运营中心</title>
+    <link rel="stylesheet" href="/static/vendor/layui/css/layui.css"><link rel="stylesheet" href="/static/css/partner.css">
+</head>
+<body class="partner-app-page">
+{include file="common/topbar" /}
+<div class="partner-app-shell">{include file="common/sidebar" /}<main class="partner-main">
+    <div class="partner-page-title"><div><p class="partner-eyebrow">GAME CONTROL</p><h1>游戏配置与调控</h1></div><span class="partner-status"><i></i>授权预设模式</span></div>
+    <div class="partner-inline-alert">控制策略按“渠道 + 游戏”发布并影响该游戏全部币种；库存查看、流水和调整已统一迁移到独立的“库存管理”模块。</div>
+    <section class="partner-content-card partner-filter-card"><form id="control-filter" class="partner-filter-grid compact"><label>商户<select id="channelId" class="layui-select" {$identity.role_code == 'platform_admin' ? '' : 'disabled'}><option value="">平台默认配置</option></select></label><button class="layui-btn partner-primary-btn" type="submit">查询</button></form></section>
+    <section class="partner-content-card">
+        <div class="partner-card-heading"><div><strong>控制配置</strong><small>预览通过游戏运行端精确数据集校验</small></div><span id="count">--</span></div>
+        <div class="partner-table-wrap"><table class="partner-table"><thead><tr><th>商户</th><th>游戏</th><th>币种</th><th>当前预设 / 版本</th><th>目标 RTP / 命中率</th><th>实际 RTP</th><th>波动 / 最大倍数</th><th>加载状态</th><th>操作</th></tr></thead><tbody id="body"></tbody></table></div>
+    </section>
+</main></div>
+<script src="/static/vendor/layui/layui.js"></script>
+<script>
+const canPublish = {$identity.role_code == 'merchant_viewer' ? 'false' : 'true'};
+const isPlatform = {$identity.role_code == 'platform_admin' ? 'true' : 'false'};
+const ownChannel = {$identity.channel_id};
+const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const money = v => Number(v || 0).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:4});
+const pct = v => v == null ? '--' : (Number(v) * 100).toFixed(2) + '%';
+let controlRows = [];
+
+async function load() {
+    const selected = isPlatform ? document.getElementById('channelId').value : ownChannel;
+    const payload = await fetch('/api/v1/game-control' + (selected ? `?channelId=${selected}` : '')).then(r => r.json());
+    if (payload.code !== 'OK') return layui.layer.msg(payload.message);
+    controlRows = payload.data;
+    document.getElementById('count').textContent = `共 ${controlRows.length} 个运行维度`;
+    document.getElementById('body').innerHTML = controlRows.length ? controlRows.map((x, index) => `<tr>
+        <td>${esc(x.show_name || x.agency_uid || ('channel ' + x.channel_id))}<small>#${x.channel_id}</small></td>
+        <td><strong>${esc(x.title || x.game_id)}</strong><small>ID ${x.game_id}</small></td><td>${esc(x.currency_code || '-')}</td>
+        <td>${esc(x.preset_name || x.preset_key)}<small>${esc(x.preset_key)} · v${x.version} / parent ${x.parent_version}</small></td>
+        <td>${pct(x.target_rtp)}<small>派彩局 ${pct(x.target_hit_rate)}</small></td>
+        <td>24h ${pct(x.actual_rtp_24h)}<small>7d ${pct(x.actual_rtp_7d)} · ${x.spins_7d || 0} 局</small></td>
+        <td>P95 ${x.p95_multiplier == null ? '--' : Number(x.p95_multiplier).toFixed(2) + 'x'}<small>P99 ${x.p99_multiplier == null ? '--' : Number(x.p99_multiplier).toFixed(2) + 'x'} / 最大 ${x.max_multiplier == null ? '--' : x.max_multiplier + 'x'}</small></td>
+        <td><span class="partner-badge ${x.load_status === 'loaded' ? 'ok' : 'off'}">${esc(x.load_status)}</span><small>${esc(x.load_error || '')}</small></td>
+        <td><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="configDetail(${index})">配置详情</button><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="presets(${x.game_id})">全部预设</button><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="history(${index})">历史</button>${canPublish && Number(x.channel_id) > 0 ? `<button class="layui-btn layui-btn-xs" onclick="openPublish(controlRows[${index}])">编辑/预览/发布</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="9" class="partner-empty">暂无控制配置</td></tr>';
+}
+
+function configDetail(index) {
+    const x = controlRows[index], bets = Array.isArray(x.bets) ? x.bets : [];
+    layui.layer.open({type:1,title:`游戏配置 · ${esc(x.title || x.game_id)} / ${esc(x.currency_code || '-')}`,area:['820px','620px'],content:`<div class="partner-detail-panel"><div class="partner-detail-row"><b>当前预设</b><span>${esc(x.preset_name || x.preset_key)}</span><b>配置版本</b><span>v${x.version} / parent ${x.parent_version}</span></div><div class="partner-detail-row"><b>目标 RTP</b><span>${pct(x.target_rtp)}</span><b>校准 RTP</b><span>${pct(x.calibrated_rtp)}</span></div><div class="partner-detail-row"><b>派彩局命中率</b><span>${pct(x.target_hit_rate)}</span><b>体验扶持</b><span>${x.experience_assist ? '启用' : '关闭'}</span></div><div class="partner-detail-row"><b>P95 / P99</b><span>${x.p95_multiplier ?? '--'}x / ${x.p99_multiplier ?? '--'}x</span><b>最大倍数</b><span>${x.max_multiplier ?? '--'}x</span></div><div class="partner-detail-row"><b>近 24h RTP</b><span>${pct(x.actual_rtp_24h)}</span><b>近 7d RTP</b><span>${pct(x.actual_rtp_7d)}（${x.spins_7d || 0} 局）</span></div><h4>投注档位</h4><p>${bets.length ? bets.map((v,i)=>`<span class="partner-badge ${Number(i)===Number(x.default_bet_index)?'ok':'off'}">${money(v)}</span>`).join(' ') : '暂无该币种投注档位'}</p><div class="partner-inline-alert">结构性参数只读；库存数据请在独立的库存管理模块查看。</div></div>`});
+}
+
+async function initChannels() {
+    const select = document.getElementById('channelId');
+    if (!isPlatform) {
+        select.innerHTML = `<option value="${ownChannel}">当前商户 #${ownChannel}</option>`;
+        return load();
+    }
+    const payload = await fetch('/api/v1/merchants/options').then(r => r.json());
+    if (payload.code === 'OK') select.innerHTML = '<option value="">平台默认配置</option>' + payload.data.map(x => `<option value="${x.id}">${esc(x.show_name || x.agency_uid)} (#${x.id})</option>`).join('');
+    return load();
+}
+
+async function presets(gameId) {
+    const payload = await fetch(`/api/v1/game-control/${gameId}/presets`).then(r => r.json());
+    if (payload.code !== 'OK') return layui.layer.msg(payload.message);
+    layui.layer.open({type:1,title:`游戏 ${gameId} 授权预设`,area:['820px','640px'],content:`<div class="partner-detail-panel">${payload.data.map(x => `<h3>${esc(x.preset_name)} <small>${esc(x.preset_key)} · v${x.version}</small></h3><p>${esc(x.description)}</p><pre class="partner-json">${esc(JSON.stringify({settings:x.settings,metrics:x.metrics},null,2))}</pre>`).join('') || '<p>暂无启用预设</p>'}</div>`});
+}
+
+async function history(index) {
+    const row = controlRows[index];
+    const payload = await fetch(`/api/v1/game-control/${row.game_id}/revisions?channelId=${row.channel_id}`).then(r => r.json());
+    if (payload.code !== 'OK') return layui.layer.msg(payload.message);
+    layui.layer.open({type:1,title:`配置历史 · channel ${row.channel_id} / game ${row.game_id}`,area:['860px','620px'],content:`<div class="partner-detail-panel">${payload.data.map(x => `<div class="partner-detail-row"><b>v${x.version}</b><span>${esc(x.action)} / ${esc(x.preset_key)}</span><span>${esc(x.operator_name || x.operator_id)}</span><span>${esc(x.create_time)} ${canPublish && Number(row.channel_id) > 0 && Number(x.version) !== Number(row.version) ? `<button class="layui-btn layui-btn-danger layui-btn-xs" onclick="openRollback(${index},${x.version})">回滚到此版本</button>` : ''}</span></div>`).join('') || '<p>暂无版本历史</p>'}</div>`});
+}
+
+async function sessionToken() {
+    const payload = await fetch('/api/v1/session').then(r => r.json());
+    if (payload.code !== 'OK') throw new Error(payload.message);
+    return payload.data.csrfToken;
+}
+
+async function openPublish(row) {
+    const [presetPayload, token] = await Promise.all([fetch(`/api/v1/game-control/${row.game_id}/presets`).then(r => r.json()), sessionToken()]);
+    if (presetPayload.code !== 'OK') return layui.layer.msg(presetPayload.message);
+    layui.layer.open({type:1,title:`预览控制配置 · ${esc(row.title || row.game_id)}`,area:['720px','560px'],content:`<div class="partner-detail-panel"><div class="partner-inline-alert">发布后影响该渠道此游戏的全部币种；当前币种仅用于校验投注档位和运行数据。</div><form id="preview-form"><label class="partner-label">观察币种</label><input class="layui-input" name="currencyCode" value="${esc(row.currency_code || '')}" required><label class="partner-label">授权预设</label><select name="presetKey" class="layui-input">${presetPayload.data.map(x => `<option value="${esc(x.preset_key)}" ${x.preset_key === row.preset_key ? 'selected' : ''}>${esc(x.preset_name)} (${esc(x.preset_key)})</option>`).join('')}</select><input type="hidden" name="channelId" value="${row.channel_id}"><input type="hidden" name="expectedVersion" value="${row.version}"><button class="layui-btn partner-primary-btn" type="submit">运行精确预览</button></form></div>`,success:() => document.getElementById('preview-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const result = await fetch(`/api/v1/game-control/${row.game_id}/preview`, {method:'POST',headers:{'X-CSRF-Token':token},body:new URLSearchParams(new FormData(event.target))}).then(r => r.json());
+        if (result.code !== 'OK') return layui.layer.msg(result.message);
+        showPublishConfirm(row, result.data);
+    })});
+}
+
+function showPublishConfirm(row, preview) {
+    layui.layer.open({type:1,title:'确认发布',area:['720px','620px'],content:`<div class="partner-detail-panel"><div class="partner-inline-alert">将生成不可变版本并要求运行节点确认加载。目标值是长期统计目标，不保证短期结果。</div><pre class="partner-json">${esc(JSON.stringify(preview.metrics,null,2))}</pre><form id="publish-form"><label class="partner-label">发布原因</label><textarea class="layui-textarea" name="reason" required minlength="5"></textarea><button class="layui-btn partner-primary-btn" type="submit">发布配置</button></form></div>`,success:() => document.getElementById('publish-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const body = new URLSearchParams(new FormData(event.target)); body.set('previewToken', preview.previewToken); body.set('idempotencyKey', crypto.randomUUID());
+        const result = await fetch(`/api/v1/game-control/${row.game_id}/publish`, {method:'POST',headers:{'X-CSRF-Token':preview.csrfToken},body}).then(r => r.json());
+        if (result.code !== 'OK') return layui.layer.msg(result.message);
+        layui.layer.closeAll(); layui.layer.msg('发布并加载成功'); load();
+    })});
+}
+
+async function openRollback(index, targetVersion) {
+    const row = controlRows[index], token = await sessionToken();
+    layui.layer.open({type:1,title:`回滚到 v${targetVersion}`,area:['620px','390px'],content:`<div class="partner-detail-panel"><div class="partner-inline-alert">回滚会创建新版本，不会覆盖历史；完成后仍需运行节点确认加载。</div><form id="rollback-form"><label class="partner-label">回滚原因</label><textarea class="layui-textarea" name="reason" required minlength="5"></textarea><button class="layui-btn layui-btn-danger" type="submit">确认回滚</button></form></div>`,success:() => document.getElementById('rollback-form').addEventListener('submit', async event => {
+        event.preventDefault(); const body = new URLSearchParams(new FormData(event.target));
+        body.set('channelId', row.channel_id); body.set('targetVersion', targetVersion); body.set('expectedVersion', row.version); body.set('idempotencyKey', crypto.randomUUID());
+        const result = await fetch(`/api/v1/game-control/${row.game_id}/rollback`, {method:'POST',headers:{'X-CSRF-Token':token},body}).then(r => r.json());
+        if (result.code !== 'OK') return layui.layer.msg(result.message);
+        layui.layer.closeAll(); layui.layer.msg('回滚并加载成功'); load();
+    })});
+}
+document.getElementById('control-filter').addEventListener('submit', event => { event.preventDefault(); load(); });
+initChannels();
+</script></body></html>

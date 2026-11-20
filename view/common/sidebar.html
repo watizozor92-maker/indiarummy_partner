@@ -1,0 +1,50 @@
+<aside class="partner-sidebar">
+    <a class="{if $activeMenu == 'dashboard'}active{/if}" href="/dashboard"><i class="layui-icon layui-icon-chart-screen"></i>运营总览</a>
+    <a class="{if $activeMenu == 'players'}active{/if}" href="/players"><i class="layui-icon layui-icon-user"></i>玩家管理</a>
+    <a class="{if $activeMenu == 'rounds'}active{/if}" href="/rounds"><i class="layui-icon layui-icon-form"></i>游戏记录</a>
+    <a class="{if $activeMenu == 'statistics'}active{/if}" href="/statistics"><i class="layui-icon layui-icon-chart"></i>数据统计</a>
+    <a class="{if $activeMenu == 'control'}active{/if}" href="/game-control"><i class="layui-icon layui-icon-set"></i>游戏调控</a>
+    <a class="{if $activeMenu == 'player_control'}active{/if}" href="/player-control"><i class="layui-icon layui-icon-user"></i>玩家调控</a>
+    <div id="inventory-sidebar-menu" class="partner-menu-group" style="display:none" data-active="{$activeMenu|htmlentities}" data-role="{$identity.role_code|htmlentities}"></div>
+    <script>
+    (()=>{
+        const box=document.getElementById('inventory-sidebar-menu');
+        const active=box.dataset.active;
+        const storageKey='partner_inventory_menu_collapsed';
+        const render=links=>{
+            const sectionActive=links.some(x=>active===x[0]);
+            let collapsed=localStorage.getItem(storageKey)==='1';
+            if(sectionActive&&localStorage.getItem(storageKey)===null)collapsed=false;
+            box.innerHTML=`<button type="button" class="partner-menu-toggle ${sectionActive?'section-active':''}" aria-expanded="${collapsed?'false':'true'}">
+                <span class="partner-menu-label"><i class="layui-icon layui-icon-rmb"></i>库存管理</span>
+                <i class="layui-icon layui-icon-down partner-menu-chevron" aria-hidden="true"></i>
+            </button><div class="partner-menu-items">${links.map(x=>`<a class="partner-submenu ${active===x[0]?'active':''}" href="${x[1]}">${x[2]}</a>`).join('')}</div>`;
+            const toggle=box.querySelector('.partner-menu-toggle');
+            const applyState=()=>{
+                box.classList.toggle('collapsed',collapsed);
+                toggle.setAttribute('aria-expanded',collapsed?'false':'true');
+            };
+            toggle.addEventListener('click',()=>{
+                collapsed=!collapsed;
+                localStorage.setItem(storageKey,collapsed?'1':'0');
+                applyState();
+            });
+            applyState();
+            box.style.display='block';
+        };
+        if(box.dataset.role==='platform_admin'){
+            render([['inventory_overview','/inventory','库存总览'],['inventory_ledger','/inventory/ledger','库存流水'],['inventory_adjustments','/inventory/adjustments','调整审批'],['inventory_grants','/inventory/grants','库存授权']]);
+            return;
+        }
+        fetch('/api/v1/inventory/access').then(r=>r.json()).then(p=>{
+            if(p.code!=='OK'||!p.data.canView)return;
+            const links=[['inventory_overview','/inventory','库存总览']];
+            if(p.data.canViewLedger)links.push(['inventory_ledger','/inventory/ledger','库存流水']);
+            if(p.data.canAdjust)links.push(['inventory_adjustments','/inventory/adjustments','调整申请']);
+            render(links);
+        }).catch(()=>{});
+    })();
+    </script>
+    {if $identity.role_code == 'platform_admin'}<a class="{if $activeMenu == 'merchants'}active{/if}" href="/merchants"><i class="layui-icon layui-icon-group"></i>商户管理</a>{/if}
+    <a class="{if $activeMenu == 'audit'}active{/if}" href="/audit"><i class="layui-icon layui-icon-auz"></i>操作审计</a>
+</aside>

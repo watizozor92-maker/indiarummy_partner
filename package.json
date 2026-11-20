@@ -1,0 +1,10 @@
+{
+  "name": "partner-game-console-assets",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned browser assets for Partner Game Console",
+  "dependencies": {
+    "echarts": "6.1.0",
+    "layui": "2.13.9"
+  }
+}

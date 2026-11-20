@@ -1,0 +1,5 @@
+<?php
+declare(strict_types=1);
+namespace app\controller\api;
+use app\exception\AuthenticationException;use app\service\ApiResponder;use app\service\AuthService;use app\service\CsrfTokenService;use app\service\TenantContext;use think\Request;use think\Response;
+final class Account{public function password(Request $request,TenantContext $tenant,CsrfTokenService $csrf,AuthService $auth,ApiResponder $api):Response{if(!$csrf->validate('api',(string)$request->header('x-csrf-token','')))return $api->error('CSRF_INVALID','页面已过期，请刷新后重试',419);$new=(string)$request->post('newPassword','');if($new!==(string)$request->post('confirmPassword',''))return $api->error('VALIDATION_FAILED','两次输入的新密码不一致',422);try{$auth->changePassword($tenant->user(),(string)$request->post('currentPassword',''),$new,(string)$request->ip(),(string)$request->header('user-agent',''));return $api->success(['csrfToken'=>$csrf->issue('api')],'密码已更新');}catch(AuthenticationException $e){return $api->error('VALIDATION_FAILED',$e->getMessage(),422);}}}

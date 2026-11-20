@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>商户管理 - 渠道游戏运营中心</title>
+  <link rel="stylesheet" href="/static/vendor/layui/css/layui.css"><link rel="stylesheet" href="/static/css/partner.css">
+</head>
+<body class="partner-app-page">
+{include file="common/topbar" /}
+<div class="partner-app-shell">{include file="common/sidebar" /}<main class="partner-main">
+  <div class="partner-page-title"><div><p class="partner-eyebrow">MERCHANTS</p><h1>商户管理</h1></div><div><span class="partner-status"><i></i>API 密钥脱敏</span> <button id="create-merchant" class="layui-btn partner-primary-btn" type="button">新增商户</button></div></div>
+  <section class="partner-content-card partner-filter-card"><form id="merchant-filter" class="partner-filter-grid compact"><label>名称 / 编码<input class="layui-input" name="keyword"></label><label>状态<select name="status"><option value="">全部</option><option value="1">启用</option><option value="0">停用</option></select></label><button class="layui-btn partner-primary-btn" type="submit">查询</button></form></section>
+  <section class="partner-content-card">
+    <div class="partner-card-heading"><div><strong>合作渠道</strong><small>来自 d_channel_parter</small></div><span id="merchant-count">--</span></div>
+    <div class="partner-table-wrap"><table class="partner-table"><thead><tr><th>ID / 商户</th><th>默认币种</th><th>玩家数</th><th>额度</th><th>已使用</th><th>API 密钥</th><th>状态</th><th>操作</th></tr></thead><tbody id="merchant-body"></tbody></table></div>
+  </section>
+</main></div>
+<script src="/static/vendor/layui/layui.js"></script>
+<script>
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const money=v=>Number(v||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:4});
+let csrfToken='';
+function bindCurrencyChoices(form){
+  const boxes=[...form.querySelectorAll('input[name="currencyCodes[]"]')],radios=[...form.querySelectorAll('input[name="defaultCurrency"]')];
+  radios.forEach(radio=>radio.addEventListener('change',()=>{const box=boxes.find(x=>x.value===radio.value);if(box)box.checked=true;}));
+  boxes.forEach(box=>box.addEventListener('change',()=>{if(!box.checked){const radio=radios.find(x=>x.value===box.value);if(radio&&radio.checked)radio.checked=false;}}));
+}
+async function load(){
+  const q=new URLSearchParams(new FormData(document.getElementById('merchant-filter'))),body=document.getElementById('merchant-body');
+  const p=await fetch('/api/v1/merchants?'+q).then(r=>r.json());
+  if(p.code!=='OK'){body.innerHTML=`<tr><td colspan="8" class="partner-empty partner-error">${esc(p.message)}</td></tr>`;return;}
+  document.getElementById('merchant-count').textContent=`共 ${p.data.total} 个`;
+  body.innerHTML=p.data.items.map(x=>`<tr><td><strong>#${x.id} ${esc(x.show_name||'-')}</strong><small>${esc(x.agency_uid||'-')}</small></td><td>${esc(x.currency_code||'-')}</td><td>${x.user_count}</td><td>信用 ${money(x.credit_limit)}<small>采购 ${money(x.purchase_limit)}</small></td><td>${money(x.used_coin)}</td><td><code>${esc(x.api_key_masked||'未设置')}</code></td><td><span class="partner-badge ${Number(x.status)===1?'ok':'off'}">${Number(x.status)===1?'启用':'停用'}</span></td><td><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="detail(${x.id})">详情</button><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="currencies(${x.id})">币种</button><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="controlGrants(${x.id})">调控授权</button><a class="layui-btn layui-btn-primary layui-btn-xs" href="/inventory/grants?channelId=${x.id}">库存授权</a><button class="layui-btn layui-btn-primary layui-btn-xs" onclick="security(${x.id})">白名单</button></td></tr>`).join('');
+}
+async function detail(id){
+  const p=await fetch('/api/v1/merchants/'+id).then(r=>r.json());if(p.code!=='OK')return layui.layer.msg(p.message);const x=p.data;
+  layui.layer.open({type:1,title:`商户 #${id}`,area:['760px','620px'],content:`<div class="partner-detail-panel"><h3>${esc(x.show_name||x.agency_uid)}</h3><div class="partner-detail-row"><b>商户编码</b><span>${esc(x.agency_uid)}</span><b>玩家数</b><span>${x.user_count}</span></div><div class="partner-detail-row"><b>联系电话</b><span>${esc(x.phone||'-')}</span><b>社交账号</b><span>${esc(x.social_code||'-')}</span></div><div class="partner-detail-row"><b>API 密钥</b><span><code>${esc(x.api_key_masked||'未设置')}</code></span></div><h4>授权币种</h4>${x.currencies.length?x.currencies.map(c=>`<div class="partner-detail-row"><b>${esc(c.currency_code)}</b><span>${esc(c.currency_name||'')}</span><span>${Number(c.is_default)===1?'默认币种':''}</span><span>${Number(c.status)===1?'启用':'停用'}</span></div>`).join(''):'<p>暂无币种映射</p>'}</div>`});
+}
+async function createMerchant(){
+  const [options,session]=await Promise.all([fetch('/api/v1/merchants/currency-options').then(r=>r.json()),fetch('/api/v1/session').then(r=>r.json())]);
+  if(options.code!=='OK'||session.code!=='OK')return layui.layer.msg(options.message||session.message);csrfToken=session.data.csrfToken;
+  const currencies=options.data||[],defaultCode=(currencies.find(x=>x.currency_code==='CNY')||currencies[0]||{}).currency_code||'';
+  const rows=currencies.map(x=>`<label class="partner-detail-row"><span><input type="checkbox" name="currencyCodes[]" value="${esc(x.currency_code)}" ${['CNY','USD'].includes(x.currency_code)?'checked':''}> <b>${esc(x.currency_code)}</b> ${esc(x.currency_name||'')}</span><span>${esc(x.symbol||'')} · ${Number(x.decimal_places||0)} 位小数</span><span>默认 <input type="radio" name="defaultCurrency" value="${esc(x.currency_code)}" ${x.currency_code===defaultCode?'checked':''}></span></label>`).join('')||'<p class="partner-empty">系统币种目录中暂无已启用币种</p>';
+  layui.layer.open({type:1,title:'新增合作商户',area:['760px','760px'],content:`<form id="merchant-create-form" class="partner-detail-panel"><div class="partner-inline-alert">API Key 将自动生成，创建成功后只显示一次，请立即安全保存。</div><label class="partner-label">商户编码</label><input class="layui-input" name="agencyUid" minlength="3" maxlength="32" placeholder="例如 agency10001" required><label class="partner-label">商户名称</label><input class="layui-input" name="showName" minlength="2" maxlength="32" required><div class="partner-detail-row"><label>返点<input class="layui-input" type="number" name="backRate" min="0" max="100" step="0.01" value="0"></label><label>联系电话<input class="layui-input" name="phone" maxlength="20"></label></div><label class="partner-label">社交账号</label><input class="layui-input" name="socialCode" maxlength="20"><div class="partner-detail-row"><label>信用额度<input class="layui-input" type="number" name="creditLimit" min="0" step="1" value="0" required></label><label>采购额度<input class="layui-input" type="number" name="purchaseLimit" min="0" step="1" value="0" required></label></div><label class="partner-detail-row"><span><b>立即启用</b></span><input type="checkbox" name="status" value="1" checked></label><h4>币种授权</h4><div class="partner-inline-alert">选项从系统币种目录实时读取。新商户默认授权 CNY、USD，也可勾选其它币种；默认币种必须同时获得授权。</div>${rows}<button class="layui-btn partner-primary-btn" type="submit" ${currencies.length?'':'disabled'}>创建商户</button></form>`,success:()=>{const createForm=document.getElementById('merchant-create-form');bindCurrencyChoices(createForm);createForm.addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target),body=new URLSearchParams();for(const [key,value] of form.entries())body.append(key,value);if(!form.has('status'))body.set('status','0');const r=await fetch('/api/v1/merchants',{method:'POST',headers:{'X-CSRF-Token':csrfToken},body}).then(x=>x.json());if(r.code!=='OK')return layui.layer.msg(r.message);csrfToken=r.data.csrfToken;layui.layer.closeAll();showCreatedMerchant(r.data);load();});}});
+}
+function showCreatedMerchant(data){
+  layui.layer.open({type:1,title:'商户创建成功',area:['680px','460px'],content:`<div class="partner-detail-panel"><div class="partner-inline-alert">这是 API Key 唯一一次明文展示。关闭窗口前请复制并保存到安全位置。</div><div class="partner-detail-row"><b>商户 ID</b><span>#${data.channelId}</span><b>商户编码</b><span>${esc(data.agencyUid)}</span></div><label class="partner-label">API Key</label><textarea id="new-api-key" class="layui-textarea" readonly>${esc(data.apiKey)}</textarea><button class="layui-btn partner-primary-btn" type="button" onclick="navigator.clipboard.writeText(document.getElementById('new-api-key').value).then(()=>layui.layer.msg('已复制'))">复制 API Key</button><p>下一步可为该商户配置调控预设授权、后台 IP 白名单和商户管理员账号。</p></div>`});
+}
+async function currencies(id){
+  const [merchant,options,session]=await Promise.all([fetch('/api/v1/merchants/'+id).then(r=>r.json()),fetch('/api/v1/merchants/currency-options').then(r=>r.json()),fetch('/api/v1/session').then(r=>r.json())]);
+  if(merchant.code!=='OK'||options.code!=='OK')return layui.layer.msg(merchant.message||options.message);
+  const enabled=new Set(merchant.data.currencies.filter(x=>Number(x.status)===1).map(x=>x.currency_code)),currentDefault=(merchant.data.currencies.find(x=>Number(x.is_default)===1&&Number(x.status)===1)||{}).currency_code||'';
+  const rows=options.data.map(x=>`<label class="partner-detail-row"><span><input type="checkbox" name="currencyCodes[]" value="${esc(x.currency_code)}" ${enabled.has(x.currency_code)?'checked':''}> <b>${esc(x.currency_code)}</b> ${esc(x.currency_name||'')}</span><span>${esc(x.symbol||'')} · ${Number(x.decimal_places||0)} 位小数</span><span>默认 <input type="radio" name="defaultCurrency" value="${esc(x.currency_code)}" ${currentDefault===x.currency_code?'checked':''}></span></label>`).join('');
+  layui.layer.open({type:1,title:`商户 #${id} 币种授权`,area:['700px','600px'],content:`<form id="currency-form" class="partner-detail-panel"><div class="partner-inline-alert">授权选项来自系统币种目录；保存后该商户才能使用对应币种。调控策略按渠道与游戏共享，库存和统计仍按币种隔离。</div>${rows}<button class="layui-btn partner-primary-btn" type="submit">保存币种授权</button></form>`,success:()=>{const currencyForm=document.getElementById('currency-form');bindCurrencyChoices(currencyForm);currencyForm.addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target),body=new URLSearchParams();form.getAll('currencyCodes[]').forEach(x=>body.append('currencyCodes[]',x));body.set('defaultCurrency',form.get('defaultCurrency')||'');const r=await fetch(`/api/v1/merchants/${id}/currencies`,{method:'PUT',headers:{'X-CSRF-Token':session.data.csrfToken},body}).then(x=>x.json());if(r.code!=='OK')return layui.layer.msg(r.message);layui.layer.closeAll();layui.layer.msg('币种授权已更新');load();});}});
+}
+async function controlGrants(id){
+  const [grants,session]=await Promise.all([fetch(`/api/v1/merchants/${id}/control-grants`).then(r=>r.json()),fetch('/api/v1/session').then(r=>r.json())]);
+  if(grants.code!=='OK')return layui.layer.msg(grants.message);
+  const rows=grants.data.map((x,index)=>`<label class="partner-detail-row"><span><b>${esc(x.title||x.game_id)}</b><small>ID ${x.game_id}</small></span><span>${esc(x.preset_name)}<small>${esc(x.preset_key)}</small></span><span>${esc(x.description||'')}</span><span><input type="checkbox" data-index="${index}" ${Number(x.status)===1?'checked':''}> 允许</span></label>`).join('');
+  layui.layer.open({type:1,title:`商户 #${id} 调控预设授权`,area:['900px','680px'],content:`<div class="partner-detail-panel"><div class="partner-inline-alert">商户只能发布这里明确启用的预设；关闭授权不会改写已加载版本。</div>${rows||'<p>暂无可授权预设</p>'}</div>`,success:()=>document.querySelectorAll('[data-index]').forEach(input=>input.addEventListener('change',async event=>{const x=grants.data[Number(event.target.dataset.index)],body=new URLSearchParams({presetKey:x.preset_key,status:event.target.checked?'1':'0'});event.target.disabled=true;const result=await fetch(`/api/v1/merchants/${id}/games/${x.game_id}/control-grant`,{method:'PUT',headers:{'X-CSRF-Token':session.data.csrfToken},body}).then(r=>r.json());event.target.disabled=false;if(result.code!=='OK'){event.target.checked=!event.target.checked;return layui.layer.msg(result.message);}layui.layer.msg('授权已更新');}))});
+}
+async function security(id){
+  const [rules,session]=await Promise.all([fetch(`/api/v1/merchants/${id}/ip-whitelist`).then(r=>r.json()),fetch('/api/v1/session').then(r=>r.json())]);if(rules.code!=='OK')return layui.layer.msg(rules.message);const token=session.data.csrfToken;
+  layui.layer.open({type:1,title:`商户 #${id} 后台 IP 白名单`,area:['760px','620px'],content:`<div class="partner-detail-panel"><div id="rules">${renderRules(rules.data)}</div><h4>新增规则</h4><form id="rule-form"><div class="partner-detail-row"><b>IP / CIDR</b><input class="layui-input" name="ipOrCidr" placeholder="203.0.113.10/32"><b>备注</b><input class="layui-input" name="remark"></div><button class="layui-btn partner-primary-btn" type="submit">新增</button></form></div>`,success:()=>document.getElementById('rule-form').addEventListener('submit',async e=>{e.preventDefault();const r=await fetch(`/api/v1/merchants/${id}/ip-whitelist`,{method:'POST',headers:{'X-CSRF-Token':token},body:new URLSearchParams(new FormData(e.target))}).then(x=>x.json());if(r.code!=='OK')return layui.layer.msg(r.message);layui.layer.closeAll();security(id);})});
+}
+function renderRules(rows){return rows.length?rows.map(x=>`<div class="partner-detail-row"><b>${esc(x.ip_or_cidr)}</b><span>${esc(x.remark||'-')}</span><span><span class="partner-badge ${Number(x.status)===1?'ok':'off'}">${Number(x.status)===1?'启用':'停用'}</span></span><span>${esc(x.updated_at)}</span></div>`).join(''):'<p>暂无规则。创建后台账号前必须先配置至少一条规则。</p>';}
+document.getElementById('merchant-filter').addEventListener('submit',e=>{e.preventDefault();load()});document.getElementById('create-merchant').addEventListener('click',createMerchant);load();
+</script>
+</body></html>
