@@ -81,7 +81,7 @@ final class CreateAdmin extends Command
         }
 
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
-        $db->transaction(function () use ($db, $username, $displayName, $roleCode, $channelId, $ipRule, $password, $now): void {
+        $whitelistReused = $db->transaction(function () use ($db, $username, $displayName, $roleCode, $channelId, $ipRule, $password, $now): bool {
             $userId = (int) $db->table('partner_admin_user')->insertGetId([
                 'channel_id' => $channelId,
                 'username' => $username,
@@ -98,6 +98,20 @@ final class CreateAdmin extends Command
                 'updated_at' => $now,
             ]);
 
+            $existingRule = $db->table('partner_admin_ip_whitelist')
+                ->where(['channel_id' => $channelId, 'ip_or_cidr' => $ipRule])
+                ->lock(true)
+                ->find();
+            if (is_array($existingRule)) {
+                if ((int) $existingRule['status'] !== 1) {
+                    $db->table('partner_admin_ip_whitelist')->where('id', (int) $existingRule['id'])->update([
+                        'status' => 1,
+                        'updated_at' => $now,
+                    ]);
+                }
+                return true;
+            }
+
             $db->table('partner_admin_ip_whitelist')->insert([
                 'channel_id' => $channelId,
                 'ip_or_cidr' => $ipRule,
@@ -107,9 +121,13 @@ final class CreateAdmin extends Command
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+            return false;
         });
 
         $output->writeln(sprintf('<info>Administrator %s created for channel %d.</info>', $username, $channelId));
+        if ($whitelistReused) {
+            $output->writeln(sprintf('<comment>Reused existing IP whitelist rule %s for channel %d.</comment>', $ipRule, $channelId));
+        }
         return 0;
     }
 

@@ -30,6 +30,11 @@ final class InternalGameApiClient
         return $this->request('reloadcurrency', []);
     }
 
+    public function reloadMerchant(int $channelId): array
+    {
+        return $this->request('reloadmerchant', ['channelid' => $channelId]);
+    }
+
     public function reloadPlayerControl(int $channelId, int $uid, int $gameId, string $currencyCode): array
     {
         return $this->request('reloadplayercontrol', ['channelid'=>$channelId,'uid'=>$uid,'gameid'=>$gameId,'currencycode'=>strtoupper($currencyCode)]);

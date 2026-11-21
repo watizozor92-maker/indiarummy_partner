@@ -47,6 +47,10 @@ Route::get('api/v1/merchants/currency-options', 'api.Merchants/currencyOptions')
 Route::post('api/v1/merchants', 'api.Merchants/create')
     ->middleware(Authenticate::class)
     ->middleware(RequirePermission::class, 'merchants.create');
+Route::put('api/v1/merchants/<channelId>', 'api.Merchants/update')
+    ->pattern(['channelId' => '\d+'])
+    ->middleware(Authenticate::class)
+    ->middleware(RequirePermission::class, 'merchants.manage');
 Route::put('api/v1/merchants/<channelId>/currencies', 'api.Merchants/updateCurrencies')
     ->pattern(['channelId' => '\d+'])
     ->middleware(Authenticate::class)
@@ -81,13 +85,17 @@ Route::get('api/v1/rounds', 'api.Rounds/index')
 Route::get('api/v1/statistics', 'api.Statistics/index')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'statistics.view');
 Route::get('api/v1/statistics-export', 'api.Statistics/export')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'statistics.view');
 Route::get('api/v1/game-control/<gameId>/presets', 'api.GameControl/presets')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.view');
+Route::get('api/v1/game-control/<gameId>/scope', 'api.GameControl/scope')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.view');
+Route::post('api/v1/game-control/<gameId>/target-preview', 'api.GameControl/targetPreview')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.preview');
 Route::get('api/v1/game-control/<gameId>/revisions', 'api.GameControl/revisions')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.view');
 Route::get('api/v1/game-control/<gameId>/runtime-status', 'api.GameControl/runtimeStatus')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.view');
 Route::post('api/v1/game-control/<gameId>/preview', 'api.GameControl/preview')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.preview');
 Route::post('api/v1/game-control/<gameId>/publish', 'api.GameControl/publish')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.publish_authorized');
 Route::post('api/v1/game-control/<gameId>/rollback', 'api.GameControl/rollback')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.publish_authorized');
+Route::post('api/v1/game-control/<gameId>/restore-default', 'api.GameControl/restoreDefault')->pattern(['gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.publish_authorized');
 Route::get('api/v1/merchants/<channelId>/control-grants', 'api.GameControl/grants')->pattern(['channelId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'merchants.view');
 Route::put('api/v1/merchants/<channelId>/games/<gameId>/control-grant', 'api.GameControl/setGrant')->pattern(['channelId'=>'\d+','gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'merchants.manage');
+Route::put('api/v1/merchants/<channelId>/games/<gameId>/control-scope', 'api.GameControl/setScope')->pattern(['channelId'=>'\d+','gameId'=>'\d+'])->middleware(Authenticate::class)->middleware(RequirePermission::class, 'merchants.manage');
 Route::get('api/v1/game-control', 'api.GameControl/index')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'game_control.view');
 Route::get('api/v1/player-control/options','api.PlayerControl/options')->middleware(Authenticate::class)->middleware(RequirePermission::class,'player_control.view');
 Route::get('api/v1/player-control-export','api.PlayerControl/export')->middleware(Authenticate::class)->middleware(RequirePermission::class,'player_control.view');
