@@ -66,7 +66,7 @@ final class PlayerRepository
         return ['items' => $items, 'page' => $page, 'pageSize' => $pageSize, 'total' => $total];
     }
 
-    public function find(int $channelId, int $uid): ?array
+    public function find(int $channelId, int $uid, string $from, string $to, ?string $currencyCode): ?array
     {
         $player = Db::connect('game')->table('d_user')->where('channel_agency', $channelId)
             ->where('uid', $uid)
@@ -76,15 +76,26 @@ final class PlayerRepository
             return null;
         }
 
-        $player['statistics'] = Db::connect('game')->table('d_slot_inventory_ledger')
-            ->where('channel_id', $channelId)->where('uid', $uid)
+        $base = Db::connect('game')->table('d_slot_inventory_ledger')
+            ->where('channel_id', $channelId)->where('uid', $uid)->whereBetween('create_time', [$from, $to]);
+        if ($currencyCode !== null && $currencyCode !== '') {
+            $base->where('currency_code', strtoupper($currencyCode));
+        }
+        $player['statistics'] = (clone $base)
             ->fieldRaw('currency_code, SUM(bet) AS bet_amount, SUM(payout) AS payout_amount, SUM(bet-payout) AS profit_amount, COUNT(*) AS spin_count, MAX(create_time) AS last_play_at')
             ->group('currency_code')->select()->toArray();
-        $player['games'] = Db::connect('game')->table('d_slot_inventory_ledger')->alias('l')
+        $games = Db::connect('game')->table('d_slot_inventory_ledger')->alias('l')
             ->leftJoin('s_game g', 'g.id=l.game_id')
-            ->where('l.channel_id', $channelId)->where('l.uid', $uid)
+            ->where('l.channel_id', $channelId)->where('l.uid', $uid)->whereBetween('l.create_time', [$from, $to]);
+        if ($currencyCode !== null && $currencyCode !== '') {
+            $games->where('l.currency_code', strtoupper($currencyCode));
+        }
+        $player['games'] = $games
             ->fieldRaw('l.game_id,g.title,l.currency_code,SUM(l.bet) AS bet_amount,SUM(l.payout) AS payout_amount,SUM(l.bet-l.payout) AS profit_amount,COUNT(*) AS spin_count,MAX(l.create_time) AS last_play_at')
             ->group('l.game_id,g.title,l.currency_code')->order('last_play_at','desc')->select()->toArray();
+        $player['daily_trend'] = (clone $base)
+            ->fieldRaw('DATE(create_time) stat_date,currency_code,SUM(bet) bet_amount,SUM(payout) payout_amount,SUM(bet-payout) profit_amount,COUNT(*) spin_count')
+            ->group('DATE(create_time),currency_code')->order('stat_date')->order('currency_code')->select()->toArray();
         $player['recent_rounds'] = Db::connect('game')->table('d_slot_inventory_ledger')->alias('l')
             ->leftJoin('s_game g', 'g.id=l.game_id')
             ->where('l.channel_id', $channelId)->where('l.uid', $uid)

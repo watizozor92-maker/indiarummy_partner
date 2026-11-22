@@ -45,11 +45,19 @@ final class Players
         ));
     }
 
-    public function detail(int $uid, Request $request, TenantContext $tenant, PlayerRepository $repository, ApiResponder $api, AuditService $audit): Response
+    public function detail(int $uid, Request $request, TenantContext $tenant, DateRangeService $dates, PlayerRepository $repository, ApiResponder $api, AuditService $audit): Response
     {
         $channelId = $this->requiredChannel($request, $tenant, $api);
         if ($channelId instanceof Response) return $channelId;
-        $player = $repository->find($channelId, $uid);
+        try {
+            $range = $dates->parse($request->get('from'), $request->get('to'), 30);
+        } catch (InvalidArgumentException $exception) {
+            return $api->error('VALIDATION_FAILED', $exception->getMessage(), 422);
+        }
+        $player = $repository->find($channelId, $uid, $range['fromSql'], $range['toSql'], trim((string) $request->get('currencyCode', '')) ?: null);
+        if ($player !== null) {
+            $player['analytics_meta'] = ['from' => $range['from']->format(DATE_ATOM), 'to' => $range['to']->format(DATE_ATOM), 'timezone' => $range['timezone']];
+        }
 
         if ($player !== null) {
             $actor=$tenant->user();

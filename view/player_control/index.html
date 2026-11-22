@@ -8,7 +8,7 @@
   <section class="partner-content-card"><div class="partner-card-heading"><div><strong>调控任务</strong><small>目标、实际与加载状态</small></div><span id="count">--</span></div><div class="partner-table-wrap"><table class="partner-table"><thead><tr><th>玩家 / 商户</th><th>游戏 / 币种</th><th>模式</th><th>目标</th><th>实际进度</th><th>局数</th><th>有效期</th><th>状态</th><th>操作</th></tr></thead><tbody id="body"></tbody></table></div><div id="pagination" class="partner-pagination"></div></section>
 </main></div><script src="/static/vendor/layui/layui.js"></script><script>
 const isPlatform={$identity.role_code == 'platform_admin' ? 'true' : 'false'},canManage={$identity.role_code == 'merchant_viewer' ? 'false' : 'true'},ownChannel={$identity.channel_id};
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])),money=v=>Number(v||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:4}),pct=v=>v==null?'--':(Number(v)*100).toFixed(2)+'%';
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])),money=v=>Number(v||0).toLocaleString('zh-CN',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:4}),pct=v=>v==null?'--':(Number(v)*100).toFixed(2)+'%';
 let games=[],currencies=[],csrfToken='';
 const modeName={SUPPORT:'扶持',SUPPRESS:'收割',RTP_TARGET:'目标 RTP'},stateName={ACTIVE:'进行中',COMPLETED:'已完成',CANCELED:'已取消',EXPIRED:'已到期'};
 async function init(){

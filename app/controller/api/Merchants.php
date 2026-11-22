@@ -7,6 +7,7 @@ namespace app\controller\api;
 use app\repository\MerchantRepository;
 use app\service\ApiResponder;
 use app\service\CsrfTokenService;
+use app\service\DateRangeService;
 use app\service\MerchantCurrencyService;
 use app\service\MerchantService;
 use app\service\TenantContext;
@@ -68,9 +69,17 @@ final class Merchants
         }
     }
 
-    public function detail(int $channelId, MerchantRepository $repository, ApiResponder $api): Response
+    public function detail(int $channelId, Request $request, DateRangeService $dates, MerchantRepository $repository, ApiResponder $api): Response
     {
-        $merchant = $repository->find($channelId);
+        try {
+            $range = $dates->parse($request->get('from'), $request->get('to'), 7, 92);
+        } catch (InvalidArgumentException $exception) {
+            return $api->error('VALIDATION_FAILED', $exception->getMessage(), 422);
+        }
+        $merchant = $repository->find($channelId, $range['fromSql'], $range['toSql'], trim((string) $request->get('currencyCode', '')) ?: null);
+        if ($merchant !== null) {
+            $merchant['analytics_meta'] = ['from' => $range['from']->format(DATE_ATOM), 'to' => $range['to']->format(DATE_ATOM), 'timezone' => $range['timezone']];
+        }
 
         return $merchant === null
             ? $api->error('RESOURCE_NOT_FOUND', '商户不存在', 404)

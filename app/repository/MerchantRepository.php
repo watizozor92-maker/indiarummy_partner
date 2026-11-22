@@ -49,7 +49,7 @@ final class MerchantRepository
         return ['items' => $items, 'page' => $page, 'pageSize' => $pageSize, 'total' => $total];
     }
 
-    public function find(int $channelId): ?array
+    public function find(int $channelId, ?string $from = null, ?string $to = null, ?string $currencyCode = null): ?array
     {
         $merchant = Db::connect('game')->table('d_channel_parter')->where('id', $channelId)->find();
         if (!is_array($merchant)) {
@@ -67,6 +67,25 @@ final class MerchantRepository
             ->order('cc.currency_code')
             ->select()
             ->toArray();
+
+        if ($from !== null && $to !== null) {
+            $base = Db::connect('game')->table('d_slot_inventory_ledger')
+                ->where('channel_id', $channelId)->whereBetween('create_time', [$from, $to]);
+            if ($currencyCode !== null && $currencyCode !== '') {
+                $base->where('currency_code', strtoupper($currencyCode));
+            }
+            $merchant['period_statistics'] = (clone $base)
+                ->fieldRaw('currency_code,SUM(bet) bet_amount,SUM(payout) payout_amount,SUM(bet-payout) profit_amount,COUNT(*) spin_count,COUNT(DISTINCT uid) player_count')
+                ->group('currency_code')->order('currency_code')->select()->toArray();
+            $merchant['daily_trend'] = (clone $base)
+                ->fieldRaw('DATE(create_time) stat_date,currency_code,SUM(bet) bet_amount,SUM(payout) payout_amount,SUM(bet-payout) profit_amount,COUNT(*) spin_count,COUNT(DISTINCT uid) player_count')
+                ->group('DATE(create_time),currency_code')->order('stat_date')->order('currency_code')->select()->toArray();
+            foreach ($merchant['period_statistics'] as &$row) {
+                $bet = (float) $row['bet_amount'];
+                $row['actual_rtp'] = $bet > 0 ? round((float) $row['payout_amount'] / $bet, 6) : null;
+            }
+            unset($row);
+        }
 
         return $merchant;
     }
