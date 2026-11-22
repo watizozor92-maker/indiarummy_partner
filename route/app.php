@@ -32,6 +32,8 @@ Route::get('inventory/ledger', 'Inventory/ledger')->middleware(Authenticate::cla
 Route::get('inventory/adjustments', 'Inventory/adjustments')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'inventory.adjust');
 Route::get('inventory/grants', 'Inventory/grants')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'merchants.manage');
 Route::get('audit', 'Audit/index')->middleware(Authenticate::class)->middleware(RequirePermission::class, 'audit.view_self');
+Route::get('help', 'Help/index')->middleware(Authenticate::class);
+Route::get('help/download/<slug>', 'Help/download')->pattern(['slug' => '[a-z-]+'])->middleware(Authenticate::class);
 
 Route::get('api/v1/overview', 'api.Overview/index')
     ->middleware(Authenticate::class)

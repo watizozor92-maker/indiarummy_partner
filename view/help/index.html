@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>帮助中心 - 渠道游戏运营中心</title><link rel="stylesheet" href="/static/vendor/layui/css/layui.css"><link rel="stylesheet" href="/static/css/partner.css">
+<style>
+.help-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;align-items:start}.help-nav{padding:12px}.help-nav a{display:block;padding:11px 12px;border-radius:8px;color:#334155;line-height:1.45}.help-nav a:hover{background:#f3f7fb}.help-nav a.active{background:#e9f8f4;color:#087b62;font-weight:700}.help-document{padding:28px 34px}.help-document-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:center;padding-bottom:18px;border-bottom:1px solid #e8edf2}.help-document-body{font-size:16px;line-height:1.8;color:#263445}.help-document-body h1{font-size:28px;margin:24px 0 14px;color:#152536}.help-document-body h2{font-size:21px;margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid #e8edf2;color:#18374a}.help-document-body h3{font-size:18px;margin:22px 0 8px;color:#1c4f61}.help-document-body p{margin:10px 0}.help-document-body ul,.help-document-body ol{margin:10px 0 10px 24px}.help-document-body li{margin:5px 0}.help-document-body code{padding:2px 6px;border-radius:4px;background:#f1f5f9;color:#9b2c2c}.help-document-body pre{overflow:auto;padding:16px;border-radius:8px;background:#172433;color:#e8f0f7;line-height:1.65}.help-document-body pre code{padding:0;background:transparent;color:inherit}@media(max-width:900px){.help-layout{grid-template-columns:1fr}.help-document{padding:22px 18px}.help-document-toolbar{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body class="partner-app-page">{include file="common/topbar" /}<div class="partner-app-shell">{include file="common/sidebar" /}<main class="partner-main">
+<div class="partner-page-title"><div><p class="partner-eyebrow">HELP CENTER</p><h1>帮助中心</h1></div><span class="partner-status"><i></i>按账号角色展示</span></div>
+<div class="partner-inline-alert">这里展示与当前账号权限匹配的操作手册。页面内容直接读取项目文档，下载后也可以发送给对应用户。</div>
+<div class="help-layout">
+<nav class="partner-content-card help-nav" aria-label="帮助文档">
+{volist name="documents" id="item"}<a class="{if $document.slug == $item.slug}active{/if}" href="/help?document={$item.slug|htmlentities}">{$item.title|htmlentities}</a>{/volist}
+</nav>
+<article class="partner-content-card help-document">
+<header class="help-document-toolbar"><div><strong>{$document.title|htmlentities}</strong><small>与当前后台功能同步维护</small></div><a class="layui-btn layui-btn-primary layui-btn-sm" href="/help/download/{$document.slug|htmlentities}">下载 Markdown</a></header>
+<div class="help-document-body">{$document.html|raw}</div>
+</article>
+</div></main></div><script src="/static/vendor/layui/layui.js"></script></body></html>
