@@ -10,6 +10,7 @@ use app\service\CsrfTokenService;
 use app\service\DateRangeService;
 use app\service\InventoryAdjustmentService;
 use app\service\InventoryGrantService;
+use app\service\InternalGameApiClient;
 use app\service\TenantContext;
 use InvalidArgumentException;
 use RuntimeException;
@@ -25,7 +26,7 @@ final class Inventory
     }
 
     public function overview(Request $request, TenantContext $tenant, InventoryGrantService $grants,
-        InventoryRepository $repository, ApiResponder $api): Response
+        InventoryRepository $repository, InternalGameApiClient $runtime, ApiResponder $api): Response
     {
         $actor = $tenant->user();
         $raw = $request->get('channelId');
@@ -41,7 +42,40 @@ final class Inventory
         if ($filterGame > 0) $gameIds = $gameIds === [] || in_array($filterGame, $gameIds, true) ? [$filterGame] : [-1];
         if ($filterCurrency !== '') $currencyCodes = $currencyCodes === [] || in_array($filterCurrency, $currencyCodes, true) ? [$filterCurrency] : ['__DENIED__'];
         $rows = $repository->overview($channelId, $gameIds, $currencyCodes);
+        $runtimeStatuses = [];
+        $runtimeAvailable = $runtime->isConfigured();
+        if ($runtimeAvailable && $rows !== []) {
+            try {
+                foreach (array_chunk($rows, 500) as $accounts) {
+                    foreach ($runtime->statuses($accounts) as $item) {
+                        $key = (int) ($item['channelId'] ?? 0) . ':' . (int) ($item['gameId'] ?? 0) . ':'
+                            . strtoupper((string) ($item['currencyCode'] ?? ''));
+                        $runtimeStatuses[$key] = is_array($item['status'] ?? null) ? $item['status'] : [];
+                    }
+                }
+            } catch (RuntimeException) {
+                $runtimeAvailable = false;
+            }
+        }
         foreach ($rows as &$row) {
+            $runtimeKey = (int) $row['channel_id'] . ':' . (int) $row['game_id'] . ':' . strtoupper((string) $row['currency_code']);
+            $runtimeStatus = $runtimeStatuses[$runtimeKey] ?? null;
+            $runtimeInventory = is_array($runtimeStatus['inventory'] ?? null) ? $runtimeStatus['inventory'] : [];
+            $row['current_scene'] = is_array($runtimeStatus) ? ($runtimeStatus['matchingScene'] ?? null) : null;
+            $row['scene_status'] = !$runtimeAvailable ? 'unavailable'
+                : (is_array($runtimeStatus) && !empty($runtimeStatus['config']) ? 'active' : 'unconfigured');
+            $row['scene_inherited'] = is_array($runtimeStatus) ? (bool) ($runtimeStatus['config']['inherited'] ?? false) : null;
+            $row['scene_priority'] = is_array($runtimeStatus) ? ($runtimeStatus['matchingScenePriority'] ?? null) : null;
+            $row['scene_condition'] = is_array($runtimeStatus['matchingSceneCondition'] ?? null)
+                ? $runtimeStatus['matchingSceneCondition'] : null;
+            $row['scene_metrics'] = $runtimeInventory === [] ? null : [
+                'effectiveReserve' => $runtimeInventory['effectiveReserve'] ?? null,
+                'targetReserve' => $runtimeInventory['targetReserve'] ?? null,
+                'inventoryRatio' => $runtimeInventory['inventoryRatio'] ?? null,
+                'experienceBudget' => $runtimeInventory['experienceBudget'] ?? null,
+                'riskUnit' => $runtimeInventory['riskUnit'] ?? null,
+                'experienceScore' => $runtimeInventory['experienceScore'] ?? null,
+            ];
             $rowAccess = $grants->effectiveFor($actor, (int) $row['channel_id'], (int) $row['game_id'], (string) $row['currency_code']);
             $row['inventory_access'] = [
                 'visibility' => $rowAccess['visibility'], 'canViewLedger' => $rowAccess['canViewLedger'],
@@ -50,6 +84,9 @@ final class Inventory
             ];
             if (!$tenant->isPlatformAdmin() && $rowAccess['visibility'] !== 'full') {
                 foreach (['experience_budget','assist_reserved','campaign_available','campaign_reserved','realized_profit','period_bet','period_payout','period_spins','period_started_at'] as $field) $row[$field] = null;
+                if (is_array($row['scene_metrics'])) {
+                    foreach (['experienceBudget','riskUnit','experienceScore'] as $field) $row['scene_metrics'][$field] = null;
+                }
             }
         }
         return $api->success($rows);

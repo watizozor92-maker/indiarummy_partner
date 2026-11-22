@@ -45,6 +45,19 @@ final class InternalGameApiClient
         return $this->request('controlstatus', ['channelid' => $channelId, 'gameid' => $gameId, 'currencycode' => strtoupper($currencyCode)]);
     }
 
+    public function statuses(array $accounts): array
+    {
+        if (count($accounts) > 500) {
+            throw new RuntimeException('单次最多查询 500 个库存场景');
+        }
+        $payload = array_map(static fn(array $account): array => [
+            'channelId' => (int) ($account['channel_id'] ?? $account['channelId'] ?? 0),
+            'gameId' => (int) ($account['game_id'] ?? $account['gameId'] ?? 0),
+            'currencyCode' => strtoupper((string) ($account['currency_code'] ?? $account['currencyCode'] ?? '')),
+        ], $accounts);
+        return $this->request('controlstatuses', [], json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    }
+
     public function adjustCashReserve(int $channelId, int $gameId, string $currencyCode, float $delta, array $operator): array
     {
         return $this->request('adjustcashreserve', [
