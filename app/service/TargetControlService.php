@@ -13,6 +13,7 @@ final class TargetControlService
 
     public function preview(array $actor,int $channelId,int $gameId,string $currency,float $targetRtpPercent,float $targetHitPercent,int $expectedVersion,string $ip,string $agent):array
     {
+        if($channelId<=0)throw new InvalidArgumentException('平台默认配置只能选择已校准预设，不支持自定义目标');
         $targetRtp=$targetRtpPercent/100;
         $targetHit=$targetHitPercent/100;
         $scope=$this->grants->scope($channelId,$gameId);
